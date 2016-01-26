@@ -13,12 +13,12 @@ void Receiver::handle(char src[], char dst[], char msg[]) {
 
 int main(int argc, char ** argv) {
    // create a receiver
-   Receiver* aReceiver=new Receiver();
+   Receiver* aReceiver=new Receiver();  //@TODO Need to be changed to static memory
    // create a wireless network abstraction
-   WLAN* aWLAN=new WLAN(LABEL);
+   WLAN* aWLAN=new WLAN(LABEL);         //@TODO Need to be changed to static memory
    // set the handler
    aWLAN->setHandler(aReceiver);
-   // initialize 
+   // initialize
    aWLAN->init();
    // start accepting frames
    aWLAN->receive();

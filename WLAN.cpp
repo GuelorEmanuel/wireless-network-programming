@@ -55,7 +55,7 @@ int WLAN::WLANAddr::str2wlan(char s[]) {
       if (a[i] > 0xff) return -1;
    }
    // assign the result to the member "data"
-   for (i=0; i < 6; i++) { 
+   for (i=0; i < 6; i++) {
       data[i]=a[i];
    }
    return 0;
@@ -68,6 +68,7 @@ WLAN::WLAN(string interface) {
   device[interface.length()] = 0;
   memcpy(device, interface.c_str(), interface.length());
 }
+WLAN::~WLAN(){}
 
 // Set message handler
 void WLAN::setHandler(Handler* aHandler) {
@@ -80,7 +81,7 @@ bool WLAN::createSocket() {
    // - SOCK_RAW : raw packets including link level header
    // create the socket
    if ((ifconfig.sockid=socket(AF_PACKET, SOCK_RAW, 0)) == -1) {
-      cerr << "Cannot open socket: " << strerror(errno) << "\n"; 
+      cerr << "Cannot open socket: " << strerror(errno) << "\n";
       return false;
    }
    cerr << "socket created!\n";
@@ -92,7 +93,7 @@ bool WLAN::fetchInterfaceIndex() {
    struct ifreq ifr;
    strcpy(ifr.ifr_name, device);
    if (ioctl(ifconfig.sockid, SIOGIFINDEX, &ifr) < 0) {
-      cerr << "Failed to fetch ifindex: " << strerror(errno) << "\n"; 
+      cerr << "Failed to fetch ifindex: " << strerror(errno) << "\n";
       return false;
    }
    ifconfig.ifindex=ifr.ifr_ifindex;
@@ -104,7 +105,7 @@ bool WLAN::fetchHardwareAddress() {
    // fetch the hardware address
    struct ifreq ifr;
    if (ioctl(ifconfig.sockid, SIOCGIFHWADDR, &ifr) == -1) {
-      cerr << "Failed to fetch hardware address: " << strerror(errno) << "\n"; 
+      cerr << "Failed to fetch hardware address: " << strerror(errno) << "\n";
       return false;
    }
    memcpy(&ifconfig.hwaddr.data, &ifr.ifr_hwaddr.sa_data, WLAN_ADDR_LEN);
@@ -118,7 +119,7 @@ bool WLAN::fetchMTU() {
    // fetch the MTU
    struct ifreq ifr;
    if (ioctl(ifconfig.sockid, SIOCGIFMTU, &ifr) == -1) {
-      cerr << "Failed to get the MTU: " << strerror(errno) << "\n"; 
+      cerr << "Failed to get the MTU: " << strerror(errno) << "\n";
       return false;
    }
    ifconfig.mtu=ifr.ifr_mtu;
@@ -135,7 +136,7 @@ bool WLAN::bindSocketToInterface() {
    sll.sll_ifindex=ifconfig.ifindex;
    sll.sll_protocol=htons(ETH_P_ALL);
    if (bind(ifconfig.sockid, (struct sockaddr*)&sll, sizeof(sll)) < 0) {
-      cerr << "Failed to bind the socket: " << strerror(errno) << "\n"; 
+      cerr << "Failed to bind the socket: " << strerror(errno) << "\n";
       return false;
    }
    cerr << "socket bind done\n";
@@ -146,7 +147,7 @@ bool WLAN::bindSocketToInterface() {
 bool WLAN::init() {
    cout << "Initializing network interface  : " << device << "\n";
    // create the socket
-   if (!createSocket()) 
+   if (!createSocket())
       return false;
    else if (!fetchInterfaceIndex())
       return false;
@@ -173,7 +174,7 @@ void WLAN::buildHeader(char address[], WLANAddr *daddr) {
 }
 
 // set the "to address"
-void WLAN::setToAddress(WLANAddr *daddr, struct sockaddr_ll *to) {  
+void WLAN::setToAddress(WLANAddr *daddr, struct sockaddr_ll *to) {
    to->sll_family = AF_PACKET;
    to->sll_ifindex = ifconfig.ifindex;
    memmove(&(to->sll_addr), daddr->data, WLAN_ADDR_LEN);
@@ -181,9 +182,10 @@ void WLAN::setToAddress(WLANAddr *daddr, struct sockaddr_ll *to) {
 }
 
 // Send
-bool WLAN::send(char address[], char message[]) {
+bool WLAN::send(char address[], char message[], char *buff) {
    // send buffer
-   char buff[WLAN_HEADER_LEN+strlen(message)];
+   //char buff[WLAN_HEADER_LEN+strlen(message)];
+
    // destination address
    WLANAddr daddr;
    // build the header
@@ -197,11 +199,11 @@ bool WLAN::send(char address[], char message[]) {
    setToAddress(&daddr, &to);
    // send a frame
    int sentlen=sendto(
-      ifconfig.sockid, buff, WLAN_HEADER_LEN+strlen(message), 0,
+      ifconfig.sockid, buff,WLAN_HEADER_LEN+strlen(message), 0,
          (sockaddr *) &to, sizeof(to));
    // Check errors
    if (sentlen == -1 ) {
-      cerr << "WLAN::sendto() failed: " << strerror(errno) << "\n"; 
+      cerr << "WLAN::sendto() failed: " << strerror(errno) << "\n";
       return false;
    }
    return true;
@@ -211,7 +213,7 @@ bool WLAN::send(char address[], char message[]) {
 void WLAN::parseReceivedFrame(char buff[]) {
    // casting to the WLAN header format
    WLANHeader * wlanHdr = (WLANHeader *) buff;
-   // get gestination in ascii
+   // get destination in ascii
    char *dst=new char[32];
    wlanHdr->destAddr.wlan2asc(dst);
    // get source in ascii
@@ -220,7 +222,7 @@ void WLAN::parseReceivedFrame(char buff[]) {
    // get my address in ascii
    char * myaddress=new char[32];
    // check destination
-   if (strcmp(dst,ifconfig.hwaddr.wlan2asc(myaddress))==0 || 
+   if (strcmp(dst,ifconfig.hwaddr.wlan2asc(myaddress))==0 ||
       dst==WLAN_BROADCAST) {
       // destination address is self or broadcast
       if (aHandler!=0) {
@@ -237,10 +239,11 @@ void WLAN::parseReceivedFrame(char buff[]) {
 void WLAN::receive() {
    // buffer for received frame
    char * buff=new char[ifconfig.mtu];
+   std::cerr << "mtu size: " << ifconfig.mtu << " : " << getWLANHeaderSize();
    // length of received frame
    unsigned int i; // frame length
    // src address of frame
-   struct sockaddr_ll from; 
+   struct sockaddr_ll from;
    socklen_t fromlen=sizeof(struct sockaddr_ll);
    // loop and receive frames
    while(true) {
@@ -253,7 +256,7 @@ void WLAN::receive() {
          i = recvfrom(ifconfig.sockid, buff, ifconfig.mtu, 0,
                 (struct sockaddr *) &from, &fromlen);
          if (i == -1) { // error
-            cerr << "Cannot receive data: " << strerror(errno) << "\n"; 
+            cerr << "Cannot receive data: " << strerror(errno) << "\n";
             // sleep for 10 milliseconds and try again
             usleep(10000);
          } else { // nor error
@@ -263,4 +266,14 @@ void WLAN::receive() {
       // parse a received frame
       parseReceivedFrame(buff);
    }
+}
+
+//getHeader method
+int WLAN::getWLANHeaderSize(){
+  //TODO need to implement this to get the header size which should not be bigger
+  //then the mtu
+  return WLAN_HEADER_LEN;
+}
+int WLAN::getMtuSize(){
+  return ifconfig.mtu;
 }

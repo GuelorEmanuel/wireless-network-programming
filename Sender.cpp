@@ -10,15 +10,22 @@ using namespace std;
 
 int main(int argc, char ** argv) {
    // create a sender
-   Sender* aSender=new Sender();
+
+   Sender*  aSender = new Sender();
    // create a wireless network abstraction
-   WLAN* aWLAN=new WLAN(LABEL);
-   // initialize 
+   WLAN*    aWLAN   = new WLAN(LABEL);
+   // initialize
    aWLAN->init();
    // send a frame
-   char a[]="ff:ff:ff:ff:ff:ff"; // broadcast address
+   char a[]   = "ff:ff:ff:ff:ff:ff"; // broadcast address
    // char a[]="1c:bd:b9:7e:b6:5a"; // unicast address
-   char f[]="This is a test frame"; // data
-   aWLAN->send(a, f);
-   return 0;
+   char f[]   = "This is a test frame"; // data
+   char *buff = new char [aWLAN->getWLANHeaderSize()+ strlen(f)];
+
+   aWLAN->send(a, f, buff);
+
+   delete[]   buff;
+   delete     aSender;
+   delete     aWLAN;
+   return     0;
 }

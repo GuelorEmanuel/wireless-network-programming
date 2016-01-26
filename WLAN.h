@@ -31,18 +31,20 @@ public:
    WLAN(string interface);
    // Destructor
    ~WLAN();
-   // Initialize 
+   // Initialize
    bool init();
    // Send a frame
-   bool send(char address[], char message[]);
+   bool send(char address[], char message[], char *buff2);
    // Set a handler
    void setHandler(Handler* aHandler);
    // Receive a frame
    void receive();
+   int  getWLANHeaderSize();
+   int getMtuSize();
 private:
    // Constants
    static const int WLAN_ADDR_LEN = 6;
-   static const int WLAN_HEADER_LEN = 14;
+   static const int WLAN_HEADER_LEN = 14; // 14 byte = 6+6 +2 total header size
    static const unsigned short IP_TYPE = 0x3901;
    const string WLAN_BROADCAST = "ff:ff:ff:ff:ff:ff";
    // Structure of a network address
@@ -74,7 +76,7 @@ private:
       // mac address
       WLANAddr hwaddr;
       // maximum transmission unit
-      int mtu;
+      int mtu;  //@TODO need this size later compare with header size
    };
    // convert a char to a hex digit
    static int hexdigit(char a);
@@ -95,12 +97,13 @@ private:
    bool createSocket();
    bool fetchInterfaceIndex();
    bool fetchHardwareAddress();
-   bool fetchMTU(); 
-   bool addPromiscuousMode(); 
-   bool bindSocketToInterface(); 
-   // Send helpers  
+   bool fetchMTU();
+   bool addPromiscuousMode();
+   bool bindSocketToInterface();
+   // Send helpers
    void buildHeader(char address[], WLANAddr *daddr);
    void setToAddress(WLANAddr *daddr, struct sockaddr_ll *to);
    // Receive helper
    void parseReceivedFrame(char buff[]);
+
 };
